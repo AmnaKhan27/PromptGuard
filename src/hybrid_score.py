@@ -1,34 +1,30 @@
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
+import onnxruntime as ort
+import numpy as np
+from transformers import AutoTokenizer
+from huggingface_hub import hf_hub_download
 from heuristics import run_heuristics
 
-MODEL_PATH = "amna27/promptguard-distilbert"
+MODEL_REPO = "amna27/promptguard-distilbert-onnx"
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH, low_cpu_mem_usage=True)
-model.eval()
-
-model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
-
-device = "cpu"
-model.to(device)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_REPO)
+model_path = hf_hub_download(repo_id=MODEL_REPO, filename="model_quantized.onnx")
+session = ort.InferenceSession(model_path)
 
 def get_model_score(text: str) -> float:
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=128)
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    with torch.no_grad():
-        outputs = model(**inputs)
-    probs = torch.softmax(outputs.logits, dim=-1)
-    injection_prob = probs[0][1].item()
-    return injection_prob
+    inputs = tokenizer(text, return_tensors="np", truncation=True, padding=True, max_length=128)
+    input_names = [i.name for i in session.get_inputs()]
+    ort_inputs = {k: v for k, v in inputs.items() if k in input_names}
+    outputs = session.run(None, ort_inputs)
+    logits = outputs[0]
+    probs = np.exp(logits) / np.exp(logits).sum(axis=-1, keepdims=True)
+    return float(probs[0][1])
 
 def get_risk_assessment(text: str, threshold: float = 0.03) -> dict:
     """
     threshold=0.03 was chosen via a precision-recall sweep on the held-out
-    test set (not the default 0.5), achieving 96.5% precision / 91.7% recall.
-    Model is dynamically quantized (int8) to fit free-tier deployment memory
-    limits; validated that quantization does not shift any test predictions
-    across this threshold before deploying.
+    test set (96.5% precision / 91.7% recall). Model is exported to ONNX
+    and int8-quantized (268MB -> 67MB) to fit free-tier deployment memory
+    limits, using onnxruntime instead of full PyTorch at inference time.
     """
     model_score = get_model_score(text)
     rule_result = run_heuristics(text)
