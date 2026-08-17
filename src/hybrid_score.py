@@ -2,15 +2,15 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 from heuristics import run_heuristics
 
-# MODEL_PATH = "./promptguard_model_final"
-MODEL_PATH = "amna27/promptguard-distilbert"  # now loading from Hugging Face Hub, not local disk
-
+MODEL_PATH = "amna27/promptguard-distilbert"
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
+model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH, low_cpu_mem_usage=True)
 model.eval()
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+
+device = "cpu"
 model.to(device)
 
 def get_model_score(text: str) -> float:
@@ -26,10 +26,9 @@ def get_risk_assessment(text: str, threshold: float = 0.03) -> dict:
     """
     threshold=0.03 was chosen via a precision-recall sweep on the held-out
     test set (not the default 0.5), achieving 96.5% precision / 91.7% recall.
-    The model's raw scores are not well-calibrated around 0.5 for this
-    dataset size, so the operating point was tuned deliberately rather
-    than assumed. Recall is prioritized since a missed attack is more
-    costly than a false alarm in this security context.
+    Model is dynamically quantized (int8) to fit free-tier deployment memory
+    limits; validated that quantization does not shift any test predictions
+    across this threshold before deploying.
     """
     model_score = get_model_score(text)
     rule_result = run_heuristics(text)
