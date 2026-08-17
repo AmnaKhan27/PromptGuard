@@ -2,9 +2,9 @@ import re
 import base64
 
 SUSPICIOUS_PHRASES = [
-    r"ignore (all|any|the) (previous|prior|above) instructions",
-    r"disregard (all|any|the) (previous|prior|above)",
-    r"forget (all|any|your) (previous|prior|instructions)",
+    r"ignore.{0,20}(previous|prior|above).{0,10}instructions",
+    r"disregard.{0,20}(previous|prior|above)",
+    r"forget.{0,20}(previous|prior|instructions)",
     r"you are now",
     r"act as (if|though)",
     r"new (instructions|task|rule)s?:",
