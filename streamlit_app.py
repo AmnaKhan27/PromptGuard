@@ -2,8 +2,7 @@ import streamlit as st
 import requests
 from PIL import Image
 
-!sed -i 's/favicon = Image.open("assets\/favicon_64.png")/favicon = Image.open("assets\/logo_512.png")/' streamlit_app.py
-#favicon = Image.open("assets/favicon_64.png")
+favicon = Image.open("assets/logo_512.png")
 
 st.set_page_config(page_title="PromptGuard", page_icon=favicon, layout="centered")
 
