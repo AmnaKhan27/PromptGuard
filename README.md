@@ -15,7 +15,7 @@ This isn't theoretical — in June 2025, researchers disclosed EchoLeak (CVE-202
 
 ## The Solution
 
-PromptGuard is a FastAPI REST API a developer adds before their existing LLM call — no changes to the LLM integration itself required:
+PromptGuard is a FastAPI built REST API a developer adds before their existing LLM call — no changes to the LLM integration itself required:
 
 ```
 User prompt → PromptGuard /check → flagged? → block, else forward to LLM as normal
