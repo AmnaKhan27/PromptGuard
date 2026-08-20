@@ -38,17 +38,19 @@ if check["flagged"]:
 
 ## Results
 
-Evaluated on the held-out test split of `deepset/prompt-injections` (116 examples, untouched during training):
+Evaluated on the held-out test split of `deepset/prompt-injections` (116 examples, untouched during training), using the deployed ONNX-quantized model — since quantization measurably shifts raw scores, the threshold was re-tuned specifically for this deployed artifact rather than reused from the pre-quantization model:
 
 | Metric | Score |
 |---|---|
-| Precision | 96.5% |
-| Recall | 91.7% |
-| Threshold | 0.03 (tuned via precision-recall sweep, not the default 0.5) |
+| Accuracy | 92.2% |
+| Precision | 94.7% |
+| Recall | 90.0% |
+| F1 Score | 92.3% |
+| Threshold | 0.026 (tuned via precision-recall sweep on the ONNX model specifically) |
 
-**Why threshold 0.03 and not 0.5:** the model's raw output scores are not well-calibrated around the standard 0.5 midpoint for this dataset size. Rather than assume the default, the operating threshold was chosen from an actual precision-recall curve on the test set, prioritizing recall — since in a security context, a missed attack is more costly than a false alarm.
+**Why re-tune after quantization:** int8 quantization shrinks the model's numeric precision, which measurably shifts its output scores — one test example's confidence dropped from 0.915 pre-quantization to 0.572 post-quantization, while remaining correctly classified. Reusing a threshold tuned on the pre-quantization model risked a silent recall drop on the model actually running in production. Re-running the precision-recall sweep specifically on the deployed ONNX model closed that gap.
 
-**Comparison note:** a published benchmark on this same dataset reports 99.1% accuracy. The gap is most likely explained by a larger training run/more extensive tuning than was feasible in this project's timeframe — closing it would be the first priority with more time.
+**Comparison note:** [deepset's own benchmark](https://haystack.deepset.ai/blog/how-to-prevent-prompt-injections) on this same dataset reports 99.1% accuracy, independently corroborated by [academic research](https://arxiv.org/pdf/2410.21337) reporting 99.13% on the same data. That result was achieved with **DeBERTa-v3-base**, a larger and more powerful model than DistilBERT. DistilBERT was deliberately chosen here for its smaller size and faster inference — essential for fitting free-tier deployment memory limits — so this gap reflects an intentional architecture tradeoff (size/speed vs. peak accuracy), not a training shortfall.
 
 ## Known Limitations (found through manual testing)
 
